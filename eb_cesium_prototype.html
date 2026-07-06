@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EB · Cesium ion BIM Prototype</title>
+
+<!-- CesiumJS 1.142.0 served from jsDelivr (mirrors the npm package).
+     The cesium.com download CDN only hosts selected releases, so it 404s on
+     many versions; jsDelivr mirrors every published npm version reliably. -->
+<script>
+  window.CESIUM_BASE_URL = "https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/";
+</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Cesium.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cesium@1.142.0/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div id="cesiumContainer"></div>
+
+<!-- Top-right: Presentation + Language (always visible) -->
+<div id="topbar" class="panel">
+  <button class="tool" id="presentBtn" data-i18n="tool.presentation">Presentation</button>
+  <button class="tool" id="langBtn">日本語</button>
+</div>
+
+<!-- Connect -->
+<div id="connect" class="panel">
+  <h1>EB · ion BIM Viewer</h1>
+  <p class="sub" data-i18n="connect.sub">Load a 3D Tiles asset from Cesium ion and inspect it.</p>
+  <label for="token" data-i18n="connect.tokenLabel">ion access token</label>
+  <input id="token" type="password" placeholder="eyJhbG..." autocomplete="off" spellcheck="false" />
+  <label for="assetId" data-i18n="connect.assetLabel">Asset ID</label>
+  <input id="assetId" type="text" placeholder="e.g. 2895432" inputmode="numeric" spellcheck="false" />
+  <button id="loadBtn" data-i18n="connect.load">Load asset</button>
+  <div id="status"></div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar" class="panel">
+  <button class="tool active" data-mode="inspect"><span class="dot"></span><span data-i18n="tool.inspect">Inspect</span></button>
+  <button class="tool" data-mode="distance"><span class="dot"></span><span data-i18n="tool.distance">Distance</span></button>
+  <button class="tool" data-mode="area"><span class="dot"></span><span data-i18n="tool.area">Area</span></button>
+  <div class="sep"></div>
+  <button class="tool" id="positionBtn" data-i18n="tool.position">Position</button>
+  <button class="tool" id="clearBtn" data-i18n="tool.clear">Clear</button>
+  <button class="tool" id="homeBtn" data-i18n="tool.recenter">Recenter</button>
+  <button class="tool" id="terrainBtn" data-i18n="tool.terrain">Terrain</button>
+</div>
+
+<!-- Measurement readout -->
+<div id="readout" class="panel"></div>
+
+<!-- Explode -->
+<div id="explode" class="panel">
+  <div class="row">
+    <h2 data-i18n="explode.title">Disassemble</h2>
+    <span id="explodeVal">0%</span>
+  </div>
+  <input id="explodeSlider" type="range" min="0" max="100" value="0" />
+  <div class="note" data-i18n-html="explode.note">Rigid per-feature disassembly: every element (feature ID) is translated as a rigid body away from the model centre. For a curated layout, bake a per-feature <code>centroid</code> into the tileset metadata (see comments in source).</div>
+</div>
+
+<!-- Metadata -->
+<div id="meta" class="panel">
+  <div class="head"><h2 data-i18n="meta.title">Feature metadata</h2><button id="metaClose">&times;</button></div>
+  <div class="body" id="metaBody"></div>
+</div>
+
+<!-- Position -->
+<div id="position" class="panel">
+  <div class="head"><h2 data-i18n="pos.title">Position model</h2><button id="positionClose">&times;</button></div>
+  <div class="body">
+    <div class="grid">
+      <div><label for="pos-lat" data-i18n="pos.lat">Latitude</label><input id="pos-lat" type="number" step="0.000001" /></div>
+      <div><label for="pos-lon" data-i18n="pos.lon">Longitude</label><input id="pos-lon" type="number" step="0.000001" /></div>
+      <div><label for="pos-height" data-i18n="pos.height">Height (m)</label><input id="pos-height" type="number" step="any" /></div>
+      <div><label for="pos-heading" data-i18n="pos.heading">Heading °</label><input id="pos-heading" type="number" step="any" /></div>
+      <div><label for="pos-pitch" data-i18n="pos.pitch">Pitch °</label><input id="pos-pitch" type="number" step="any" /></div>
+      <div><label for="pos-roll" data-i18n="pos.roll">Roll °</label><input id="pos-roll" type="number" step="any" /></div>
+    </div>
+
+    <div class="btns">
+      <div class="row2">
+        <button class="pbtn" id="place-at-camera-btn" data-i18n="pos.placeCam">Place at camera</button>
+        <button class="pbtn" id="click-on-map-btn">Click on map</button>
+      </div>
+      <button class="pbtn" id="fly-to-model-btn" data-i18n="pos.fly">Fly to model</button>
+      <div class="row2">
+        <button class="pbtn primary" id="save-position-btn" data-i18n="pos.save">Save</button>
+        <button class="pbtn" id="reset-position-btn" data-i18n="pos.reset">Reset</button>
+      </div>
+    </div>
+
+    <div id="click-map-hint" class="hint hidden" data-i18n="pos.hint">Click a point on the globe to place the model there.</div>
+    <div id="save-position-msg" class="msg hidden"></div>
+  </div>
+</div>
+
+<!-- Presentation overlay -->
+<div id="presentation" class="present-overlay hidden">
+  <button id="presentClose" class="present-close" title="Esc">&times;</button>
+  <iframe id="presentFrame" title="Slides" src="about:blank"></iframe>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

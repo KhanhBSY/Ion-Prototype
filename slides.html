@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>EB · ion BIM Prototype — Feature Slides</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css" />
+
+<style>
+  :root { --accent: #4cc2ff; --good: #5ad18a; --warn: #e0a458; --muted: #8b97a4; }
+  .reveal { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Yu Gothic", sans-serif; }
+  .reveal h1, .reveal h2, .reveal h3 { color: var(--accent); text-transform: none; letter-spacing: 0; font-weight: 700; }
+  .reveal h1 { font-size: 2.1em; }
+  .reveal section { text-align: left; }
+  .reveal section.center { text-align: center; }
+  .reveal .tag { display:inline-block; font-size:.42em; letter-spacing:.18em; color:var(--muted); text-transform:uppercase; margin-bottom:.4em; }
+  .reveal pre { width: 100%; box-shadow: none; font-size: .52em; }
+  .reveal pre code { padding: 14px 16px; border-radius: 8px; max-height: 460px; }
+  .reveal ul { width: 100%; }
+  .reveal li { margin: .25em 0; line-height: 1.35; }
+  .reveal .muted { color: var(--muted); }
+  .reveal .good { color: var(--good); }
+  .reveal .warn { color: var(--warn); }
+  .reveal .pill { background:#1c232d; border:1px solid #2a323d; border-radius:999px; padding:.12em .6em; font-size:.7em; font-family: ui-monospace, Consolas, monospace; color:var(--accent); }
+  .reveal .two { display:grid; grid-template-columns: 1fr 1fr; gap: 0 28px; align-items:start; }
+  .reveal .file { font-family: ui-monospace, Consolas, monospace; font-size:.7em; color:var(--muted); }
+  .reveal .step { color:var(--accent); font-weight:700; }
+  #slLang {
+    position: fixed; top: 14px; right: 16px; z-index: 60;
+    background: #161b22; color: #d7dee6; border: 1px solid #2a323d; border-radius: 6px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  #slLang:hover { border-color: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+<button id="slLang">日本語</button>
+
+<div class="reveal"><div class="slides">
+
+  <!-- ───────────── Title ───────────── -->
+  <section class="center" data-background-color="#0e1116">
+    <span class="tag">EB · Cesium ion BIM Prototype</span>
+    <h1 data-i18n="titleH1">Inspect · Measure</h1>
+    <p class="muted" data-i18n="titleSub">Pulling metadata from BIM models, and measuring distance &amp; area on 3D Tiles.</p>
+    <p><span class="pill">CesiumJS 1.142</span> &nbsp; <span class="pill">3D Tiles</span> &nbsp; <span class="pill">Cesium ion</span></p>
+  </section>
+
+  <!-- ───────────── Agenda ───────────── -->
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="agendaH">What we'll cover</h2>
+    <ul>
+      <li data-i18n="agenda1"><span class="step">1 · Inspection</span> — how we pull &amp; show metadata from BIM features</li>
+      <li data-i18n="agenda2"><span class="step">2 · Distance</span> — point-to-point surface measurement</li>
+      <li data-i18n="agenda3"><span class="step">3 · Area</span> — polygon surface area in 3D</li>
+    </ul>
+    <p class="muted" style="margin-top:1em;" data-i18n="agendaNote">All three start from a single click on the model, dispatched by mode in <span class="file">js/features/dispatch.js</span>.</p>
+  </section>
+
+  <!-- ═════════════ 1 · INSPECTION ═════════════ -->
+  <section class="center" data-background-color="#10212b">
+    <span class="tag" data-i18n="f1tag">Feature 1</span>
+    <h1 data-i18n="f1h1">Inspection</h1>
+    <p class="muted" data-i18n="f1sub">Click a BIM element → highlight it → read its per-feature metadata.</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="coreH">The core idea</h2>
+    <ul>
+      <li data-i18n="core1">A BIM tileset is made of <span class="pill">Cesium3DTileFeature</span> objects — one per element (wall, beam, pipe…).</li>
+      <li data-i18n="core2">Each feature carries <strong>property key/value pairs</strong> baked in during ion tiling (IFC/DGN/FBX attributes).</li>
+      <li data-i18n="core3">We never parse the source file — we read attributes straight off the <strong>picked feature</strong> at runtime.</li>
+    </ul>
+    <p class="file">js/features/inspect.js</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="s1h">Step 1 — Pick the feature</h2>
+    <p class="muted" data-i18n="s1p"><code>scene.pick()</code> returns whatever is under the cursor. We only proceed if it's a BIM feature.</p>
+    <pre><code data-trim data-noescape class="language-javascript">
+const picked = state.viewer.scene.pick(click.position);
+
+if (!Cesium.defined(picked) ||
+    !(picked instanceof Cesium.Cesium3DTileFeature)) {
+  $("meta").classList.remove("show");   // clicked empty space / globe
+  return;
+}
+    </code></pre>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="s2h">Step 2 — Highlight it</h2>
+    <p class="muted" data-i18n="s2p">Cache the original colour so we can restore it, then tint the feature.</p>
+    <pre><code data-trim data-noescape class="language-javascript">
+state.highlighted = {
+  feature: picked,
+  color: Cesium.Color.clone(picked.color)   // remember original
+};
+picked.color = Cesium.Color.YELLOW.withAlpha(0.85);
+
+// later, on close / mode change:
+function clearHighlight() {
+  if (state.highlighted)
+    state.highlighted.feature.color = state.highlighted.color;
+}
+    </code></pre>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="s3h">Step 3 — Pull the metadata</h2>
+    <p class="muted" data-i18n="s3p">Two calls do all the work: list the keys, then read each value.</p>
+    <pre><code data-trim data-noescape class="language-javascript">
+const ids = picked.getPropertyIds();          // e.g. ["element","category","Level"...]
+
+let rows = "";
+ids.sort().forEach((id) => {
+  let val = picked.getProperty(id);           // the value for that key
+  if (val && typeof val === "object") val = JSON.stringify(val);
+  rows += `&lt;tr&gt;&lt;td&gt;${id}&lt;/td&gt;&lt;td&gt;${val}&lt;/td&gt;&lt;/tr&gt;`;
+});
+metaBody.innerHTML = `&lt;table&gt;${rows}&lt;/table&gt;`;
+    </code></pre>
+    <p class="muted" data-i18n="s3note"><span class="pill">getPropertyIds()</span> + <span class="pill">getProperty(id)</span> → that's the whole metadata API.</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="resH">Result</h2>
+    <div class="two">
+      <ul>
+        <li data-i18n="res1">Side panel shows a clean key → value table.</li>
+        <li data-i18n="res2">Selected element glows yellow in the scene.</li>
+        <li data-i18n="res3">Works for any ion BIM asset that retained attributes.</li>
+      </ul>
+      <ul>
+        <li class="muted" data-i18n="resFlow">Flow recap:</li>
+        <li data-i18n="resR1"><span class="step">pick</span> → feature</li>
+        <li data-i18n="resR2"><span class="step">highlight</span> → colour swap</li>
+        <li data-i18n="resR3"><span class="step">getPropertyIds</span> → keys</li>
+        <li data-i18n="resR4"><span class="step">getProperty</span> → values</li>
+        <li data-i18n="resR5"><span class="step">render</span> → table</li>
+      </ul>
+    </div>
+  </section>
+
+  <section data-background-color="#1a160e">
+    <h2 class="warn" data-i18n="cavH">⚠ The caveat that matters</h2>
+    <ul>
+      <li data-i18n="cav1">ion's BIM tiling <strong>sometimes strips embedded attributes</strong> to slim the tiles.</li>
+      <li data-i18n="cav2">If <span class="pill">getPropertyIds()</span> is empty, the geometry has no metadata.</li>
+      <li data-i18n="cav3"><strong>Production pattern:</strong> keep an external metadata store keyed by element ID, and look it up using the feature's ID instead of relying on embedded properties.</li>
+    </ul>
+    <p class="muted" data-i18n="cavNote">The prototype shows a clear message when a feature carries no properties.</p>
+  </section>
+
+  <!-- ═════════════ 2 · DISTANCE ═════════════ -->
+  <section class="center" data-background-color="#10212b">
+    <span class="tag" data-i18n="f2tag">Feature 2</span>
+    <h1 data-i18n="f2h1">Distance</h1>
+    <p class="muted" data-i18n="f2sub">Click points on the surface → running poly-distance in metres.</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="d1h">Getting a 3D point from a click</h2>
+    <ul>
+      <li data-i18n="d1a"><span class="pill">scene.pickPosition()</span> returns the exact <strong>Cartesian3</strong> world point under the cursor — using the depth buffer, so it hits real geometry.</li>
+      <li data-i18n="d1b">Requires <span class="pill">pickPositionSupported</span> (depth texture) — we guard for it.</li>
+    </ul>
+    <pre><code data-trim data-noescape class="language-javascript">
+const pos = scene.pickPosition(click.position);
+if (!Cesium.defined(pos)) return;     // clicked empty space
+state.measurePoints.push(pos);        // collect a Cartesian3[]
+    </code></pre>
+    <p class="file">js/features/measure.js</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="d2h">Summing the segments</h2>
+    <p class="muted" data-i18n="d2p">Straight-line 3D distance between each consecutive pair, accumulated.</p>
+    <pre><code data-trim data-noescape class="language-javascript">
+let total = 0;
+for (let i = 1; i < measurePoints.length; i++) {
+  total += Cesium.Cartesian3.distance(
+    measurePoints[i - 1],
+    measurePoints[i]
+  );
+}
+// total is in metres (ECEF is metric)
+    </code></pre>
+    <ul>
+      <li data-i18n="d2a">Each click extends the line → multi-segment paths supported.</li>
+      <li data-i18n="d2b">A blue <strong>polyline</strong> + vertex dots visualise the path.</li>
+    </ul>
+  </section>
+
+  <!-- ═════════════ 3 · AREA ═════════════ -->
+  <section class="center" data-background-color="#10212b">
+    <span class="tag" data-i18n="f3tag">Feature 3</span>
+    <h1 data-i18n="f3h1">Area</h1>
+    <p class="muted" data-i18n="f3sub">Click 3+ points → closed polygon → surface area in m².</p>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="a1h">Area of a clicked 3D ring</h2>
+    <ul>
+      <li data-i18n="a1a"><strong>Fan-triangulate</strong> from the first vertex — split the ring into triangles (v₀, vᵢ, vᵢ₊₁).</li>
+      <li data-i18n="a1b">Each triangle's area = ½ · ‖a × b‖ (cross-product magnitude); sum them.</li>
+      <li data-i18n="a1c">Exact for convex rings; an approximation for concave or strongly non-planar ones.</li>
+    </ul>
+    <pre><code data-trim data-noescape class="language-javascript">
+function polygonArea3D(pts) {
+  let area = 0;
+  const v0 = pts[0];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = Cesium.Cartesian3.subtract(pts[i],     v0, new Cesium.Cartesian3());
+    const b = Cesium.Cartesian3.subtract(pts[i + 1], v0, new Cesium.Cartesian3());
+    const cross = Cesium.Cartesian3.cross(a, b, new Cesium.Cartesian3());
+    area += Cesium.Cartesian3.magnitude(cross) * 0.5;
+  }
+  return area;   // m²
+}
+    </code></pre>
+  </section>
+
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="a2h">Drawing the polygon</h2>
+    <ul>
+      <li data-i18n="a2a">The clicked ring is closed back to the first point (polyline).</li>
+      <li data-i18n="a2b">A translucent fill uses <span class="pill">perPositionHeight</span> so it follows the real 3D shape — not draped on the ground.</li>
+    </ul>
+    <pre><code data-trim data-noescape class="language-javascript">
+viewer.entities.add({
+  polygon: {
+    hierarchy: measurePoints,
+    perPositionHeight: true,              // honour each vertex's height
+    material: Cesium.Color.fromCssColorString("#4cc2ff").withAlpha(0.18),
+  }
+});
+    </code></pre>
+  </section>
+
+  <!-- ───────────── Wrap ───────────── -->
+  <section data-background-color="#0e1116">
+    <h2 data-i18n="wrapH">One click, three tools</h2>
+    <div class="two">
+      <ul>
+        <li data-i18n="wrap1"><span class="step">Inspect</span> → <span class="pill">scene.pick</span> → feature properties</li>
+        <li data-i18n="wrap2"><span class="step">Distance</span> → <span class="pill">pickPosition</span> → Σ segment lengths</li>
+        <li data-i18n="wrap3"><span class="step">Area</span> → <span class="pill">pickPosition</span> → fan-triangle sum</li>
+      </ul>
+      <ul>
+        <li class="muted" data-i18n="wrapR1">Mode is held in <span class="file">state.mode</span> and routed by <span class="file">dispatch.js</span>.</li>
+        <li class="muted" data-i18n="wrapR2">Each feature lives in its own module under <span class="file">js/features/</span>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="center" data-background-color="#10212b">
+    <h1 data-i18n="thanksH">Thank you</h1>
+    <p class="muted" data-i18n="thanksP">Inspect · Distance · Area — on any ion BIM asset.</p>
+  </section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+  // ── Slide localisation (self-contained; prose only, code stays as-is) ──
+  const I18N = {
+    en: {
+      titleH1: "Inspect · Measure",
+      titleSub: "Pulling metadata from BIM models, and measuring distance &amp; area on 3D Tiles.",
+      agendaH: "What we'll cover",
+      agenda1: '<span class="step">1 · Inspection</span> — how we pull &amp; show metadata from BIM features',
+      agenda2: '<span class="step">2 · Distance</span> — point-to-point surface measurement',
+      agenda3: '<span class="step">3 · Area</span> — polygon surface area in 3D',
+      agendaNote: 'All three start from a single click on the model, dispatched by mode in <span class="file">js/features/dispatch.js</span>.',
+      f1tag: "Feature 1", f1h1: "Inspection",
+      f1sub: "Click a BIM element → highlight it → read its per-feature metadata.",
+      coreH: "The core idea",
+      core1: 'A BIM tileset is made of <span class="pill">Cesium3DTileFeature</span> objects — one per element (wall, beam, pipe…).',
+      core2: 'Each feature carries <strong>property key/value pairs</strong> baked in during ion tiling (IFC/DGN/FBX attributes).',
+      core3: 'We never parse the source file — we read attributes straight off the <strong>picked feature</strong> at runtime.',
+      s1h: "Step 1 — Pick the feature",
+      s1p: "<code>scene.pick()</code> returns whatever is under the cursor. We only proceed if it's a BIM feature.",
+      s2h: "Step 2 — Highlight it",
+      s2p: "Cache the original colour so we can restore it, then tint the feature.",
+      s3h: "Step 3 — Pull the metadata",
+      s3p: "Two calls do all the work: list the keys, then read each value.",
+      s3note: '<span class="pill">getPropertyIds()</span> + <span class="pill">getProperty(id)</span> → that\'s the whole metadata API.',
+      resH: "Result",
+      res1: "Side panel shows a clean key → value table.",
+      res2: "Selected element glows yellow in the scene.",
+      res3: "Works for any ion BIM asset that retained attributes.",
+      resFlow: "Flow recap:",
+      resR1: '<span class="step">pick</span> → feature',
+      resR2: '<span class="step">highlight</span> → colour swap',
+      resR3: '<span class="step">getPropertyIds</span> → keys',
+      resR4: '<span class="step">getProperty</span> → values',
+      resR5: '<span class="step">render</span> → table',
+      cavH: "⚠ The caveat that matters",
+      cav1: "ion's BIM tiling <strong>sometimes strips embedded attributes</strong> to slim the tiles.",
+      cav2: 'If <span class="pill">getPropertyIds()</span> is empty, the geometry has no metadata.',
+      cav3: "<strong>Production pattern:</strong> keep an external metadata store keyed by element ID, and look it up using the feature's ID instead of relying on embedded properties.",
+      cavNote: "The prototype shows a clear message when a feature carries no properties.",
+      f2tag: "Feature 2", f2h1: "Distance",
+      f2sub: "Click points on the surface → running poly-distance in metres.",
+      d1h: "Getting a 3D point from a click",
+      d1a: '<span class="pill">scene.pickPosition()</span> returns the exact <strong>Cartesian3</strong> world point under the cursor — using the depth buffer, so it hits real geometry.',
+      d1b: 'Requires <span class="pill">pickPositionSupported</span> (depth texture) — we guard for it.',
+      d2h: "Summing the segments",
+      d2p: "Straight-line 3D distance between each consecutive pair, accumulated.",
+      d2a: "Each click extends the line → multi-segment paths supported.",
+      d2b: "A blue <strong>polyline</strong> + vertex dots visualise the path.",
+      f3tag: "Feature 3", f3h1: "Area",
+      f3sub: "Click 3+ points → closed polygon → surface area in m².",
+      a1h: "Area of a clicked 3D ring",
+      a1a: '<strong>Fan-triangulate</strong> from the first vertex — split the ring into triangles (v₀, vᵢ, vᵢ₊₁).',
+      a1b: "Each triangle's area = ½ · ‖a × b‖ (cross-product magnitude); sum them.",
+      a1c: "Exact for convex rings; an approximation for concave or strongly non-planar ones.",
+      a2h: "Drawing the polygon",
+      a2a: "The clicked ring is closed back to the first point (polyline).",
+      a2b: 'A translucent fill uses <span class="pill">perPositionHeight</span> so it follows the real 3D shape — not draped on the ground.',
+      wrapH: "One click, three tools",
+      wrap1: '<span class="step">Inspect</span> → <span class="pill">scene.pick</span> → feature properties',
+      wrap2: '<span class="step">Distance</span> → <span class="pill">pickPosition</span> → Σ segment lengths',
+      wrap3: '<span class="step">Area</span> → <span class="pill">pickPosition</span> → fan-triangle sum',
+      wrapR1: 'Mode is held in <span class="file">state.mode</span> and routed by <span class="file">dispatch.js</span>.',
+      wrapR2: 'Each feature lives in its own module under <span class="file">js/features/</span>.',
+      thanksH: "Thank you",
+      thanksP: "Inspect · Distance · Area — on any ion BIM asset.",
+    },
+    ja: {
+      titleH1: "検査 · 計測",
+      titleSub: "BIM モデルからメタデータを取得し、3D Tiles 上で距離と面積を計測します。",
+      agendaH: "本日の内容",
+      agenda1: '<span class="step">1 · 検査</span> — BIM フィーチャーからメタデータを取得・表示する方法',
+      agenda2: '<span class="step">2 · 距離</span> — 表面上の点間距離の計測',
+      agenda3: '<span class="step">3 · 面積</span> — 3D でのポリゴン表面積',
+      agendaNote: 'いずれもモデル上の1クリックから始まり、<span class="file">js/features/dispatch.js</span> でモードごとに振り分けられます。',
+      f1tag: "機能 1", f1h1: "検査",
+      f1sub: "BIM 要素をクリック → ハイライト → フィーチャーのメタデータを読み取り。",
+      coreH: "基本の考え方",
+      core1: 'BIM タイルセットは <span class="pill">Cesium3DTileFeature</span> オブジェクトで構成されます（壁・梁・配管など要素ごとに1つ）。',
+      core2: '各フィーチャーには、ion のタイル化時に埋め込まれた<strong>プロパティのキー／値</strong>（IFC／DGN／FBX の属性）が含まれます。',
+      core3: 'ソースファイルを解析することはなく、実行時に<strong>選択したフィーチャー</strong>から直接属性を読み取ります。',
+      s1h: "ステップ 1 — フィーチャーを選択",
+      s1p: "<code>scene.pick()</code> はカーソル下のものを返します。BIM フィーチャーの場合のみ処理を続行します。",
+      s2h: "ステップ 2 — ハイライト",
+      s2p: "元の色を保存して復元できるようにしてから、フィーチャーに色を付けます。",
+      s3h: "ステップ 3 — メタデータの取得",
+      s3p: "2つの呼び出しで完了します。キーを一覧し、各値を読み取ります。",
+      s3note: '<span class="pill">getPropertyIds()</span> + <span class="pill">getProperty(id)</span> → これがメタデータ API のすべてです。',
+      resH: "結果",
+      res1: "サイドパネルにキー → 値の表をきれいに表示。",
+      res2: "選択した要素がシーン内で黄色く光ります。",
+      res3: "属性を保持している ion BIM アセットなら何でも動作します。",
+      resFlow: "フローのまとめ:",
+      resR1: '<span class="step">選択</span> → フィーチャー',
+      resR2: '<span class="step">ハイライト</span> → 色の入れ替え',
+      resR3: '<span class="step">getPropertyIds</span> → キー',
+      resR4: '<span class="step">getProperty</span> → 値',
+      resR5: '<span class="step">描画</span> → 表',
+      cavH: "⚠ 重要な注意点",
+      cav1: "ion の BIM タイル化では、タイルを軽量化するために<strong>属性が削除されることがあります</strong>。",
+      cav2: '<span class="pill">getPropertyIds()</span> が空の場合、そのジオメトリにはメタデータがありません。',
+      cav3: "<strong>本番パターン:</strong> 要素 ID をキーにした外部メタデータストアを用意し、埋め込み属性に頼らずフィーチャーの ID で参照します。",
+      cavNote: "プロトタイプでは、フィーチャーにプロパティが無い場合に明確なメッセージを表示します。",
+      f2tag: "機能 2", f2h1: "距離",
+      f2sub: "表面上の点をクリック → メートル単位で連続距離を計測。",
+      d1h: "クリックから 3D 点を取得",
+      d1a: '<span class="pill">scene.pickPosition()</span> は、深度バッファを用いてカーソル下の正確な <strong>Cartesian3</strong> ワールド座標を返すため、実際のジオメトリにヒットします。',
+      d1b: '<span class="pill">pickPositionSupported</span>（深度テクスチャ）が必要で、これをガードしています。',
+      d2h: "区間の合計",
+      d2p: "連続する各ペア間の直線3D距離を累積します。",
+      d2a: "クリックごとに線を延長 → 複数区間の経路に対応。",
+      d2b: "青い<strong>ポリライン</strong>と頂点ドットで経路を可視化します。",
+      f3tag: "機能 3", f3h1: "面積",
+      f3sub: "3点以上クリック → 閉じたポリゴン → m² 単位の表面積。",
+      a1h: "クリックした 3D リングの面積",
+      a1a: '<strong>ファン三角分割</strong>: 最初の頂点からリングを三角形 (v₀, vᵢ, vᵢ₊₁) に分割します。',
+      a1b: "各三角形の面積 = ½ · ‖a × b‖（外積の大きさ）を合計します。",
+      a1c: "凸リングでは厳密、凹または大きく非平面のリングでは近似値です。",
+      a2h: "ポリゴンの描画",
+      a2a: "クリックしたリングは最初の点まで閉じられます（ポリライン）。",
+      a2b: '半透明のフィルは <span class="pill">perPositionHeight</span> を使い、地面に貼り付けず実際の3D形状に沿います。',
+      wrapH: "1クリックで3つのツール",
+      wrap1: '<span class="step">検査</span> → <span class="pill">scene.pick</span> → フィーチャーのプロパティ',
+      wrap2: '<span class="step">距離</span> → <span class="pill">pickPosition</span> → 区間長の総和',
+      wrap3: '<span class="step">面積</span> → <span class="pill">pickPosition</span> → ファン三角形の総和',
+      wrapR1: 'モードは <span class="file">state.mode</span> に保持され、<span class="file">dispatch.js</span> で振り分けられます。',
+      wrapR2: '各機能は <span class="file">js/features/</span> 配下の独立したモジュールに存在します。',
+      thanksH: "ありがとうございました",
+      thanksP: "検査 · 距離 · 面積 — あらゆる ion BIM アセットで。",
+    },
+  };
+
+  const params = new URLSearchParams(location.search);
+  let lang = params.get("lang") || localStorage.getItem("lang") || "en";
+
+  function applySlides() {
+    const dict = I18N[lang] || I18N.en;
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      const v = dict[el.dataset.i18n];
+      if (v != null) el.innerHTML = v;
+    });
+    const b = document.getElementById("slLang");
+    if (b) b.textContent = lang === "en" ? "日本語" : "English";
+  }
+
+  applySlides();   // localise before reveal measures slide sizes
+
+  document.getElementById("slLang").addEventListener("click", () => {
+    lang = lang === "en" ? "ja" : "en";
+    localStorage.setItem("lang", lang);
+    applySlides();
+    if (window.Reveal) Reveal.layout();
+  });
+
+  Reveal.initialize({
+    hash: true,
+    controls: true,
+    controlsLayout: "edges",       // left/right arrows on the screen edges
+    controlsBackArrows: "visible",
+    navigationMode: "linear",      // every slide advances left ↔ right (no vertical)
+    slideNumber: "c/t",
+    transition: "none",            // crisp page turns (no rolling/slide animation)
+    plugins: [RevealHighlight, RevealNotes],
+  });
+</script>
+</body>
+</html>
