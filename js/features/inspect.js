@@ -4,6 +4,7 @@
 import { state } from "../core/state.js";
 import { $, escapeHtml } from "../core/utils.js";
 import { t } from "../core/i18n.js";
+import { registerFeatureProps } from "./filter.js";
 
 export function inspectFeature(click) {
   const picked = state.viewer.scene.pick(click.position);
@@ -19,6 +20,7 @@ export function inspectFeature(click) {
   picked.color = Cesium.Color.YELLOW.withAlpha(0.85);
 
   const ids = picked.getPropertyIds();
+  if (ids && ids.length) registerFeatureProps(ids); // feed the filter's property list
   const body = $("metaBody");
   if (!ids || ids.length === 0) {
     body.innerHTML = `<div class="empty">${t("meta.empty")}</div>`;

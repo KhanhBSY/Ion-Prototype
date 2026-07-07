@@ -8,6 +8,7 @@ import { ensureViewer } from "./viewer.js";
 import { setupExplodeShader } from "./explode.js";
 import { setMode } from "./modes.js";
 import { onModelLoaded } from "./reposition.js";
+import { resetFilter } from "./filter.js";
 
 async function loadAsset() {
   const token = $("token").value.trim();
@@ -36,6 +37,7 @@ async function loadAsset() {
     state.originalCenter = Cesium.Cartesian3.clone(tileset.boundingSphere.center);
     state.modelRadius = tileset.boundingSphere.radius || 1;
 
+    resetFilter(); // clear any prior model's filter state and rebind to this tileset
     setupExplodeShader();
     await onModelLoaded(); // restore saved / drop non-georef at Tokyo before zooming
 

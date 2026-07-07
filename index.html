@@ -47,6 +47,7 @@
   <button class="tool" id="clearBtn" data-i18n="tool.clear">Clear</button>
   <button class="tool" id="homeBtn" data-i18n="tool.recenter">Recenter</button>
   <button class="tool" id="terrainBtn" data-i18n="tool.terrain">Terrain</button>
+  <button class="tool" id="filterBtn" data-i18n="tool.filter" data-i18n-title="filter.title" title="Filter objects">Filter</button>
 </div>
 
 <!-- Measurement readout -->
@@ -66,6 +67,28 @@
 <div id="meta" class="panel">
   <div class="head"><h2 data-i18n="meta.title">Feature metadata</h2><button id="metaClose">&times;</button></div>
   <div class="body" id="metaBody"></div>
+</div>
+
+<!-- Filter (isolate features by property keyword) -->
+<div id="filter" class="panel">
+  <div class="head">
+    <h2 data-i18n="filter.title">Filter objects</h2>
+    <button id="filterClose">&times;</button>
+  </div>
+  <div class="body">
+    <label class="section" data-i18n="filter.propsLabel">Properties to search</label>
+    <div class="prop-tools">
+      <button id="filterAll" data-i18n="filter.all">All</button>
+      <button id="filterNone" data-i18n="filter.none">None</button>
+    </div>
+    <div id="filterProps" class="filter-props"></div>
+    <label class="section second" for="filterInput" data-i18n="filter.keywordLabel">Keyword</label>
+    <input id="filterInput" type="text" data-i18n-ph="filter.placeholder" placeholder="Type to match…" autocomplete="off" spellcheck="false" />
+    <div class="filter-actions">
+      <button id="filterClear" class="fbtn" data-i18n="filter.clear">Clear</button>
+    </div>
+    <div id="filterMsg" class="filter-msg"></div>
+  </div>
 </div>
 
 <!-- Position -->

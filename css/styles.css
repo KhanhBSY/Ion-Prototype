@@ -87,6 +87,39 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 #meta td.v { font-family: var(--mono); word-break: break-word; }
 #meta .empty { padding: 16px 14px; font-size: 12px; color: var(--warn); line-height: 1.5; }
 
+/* ---- Filter panel (top-left; isolate features by property keyword) ---- */
+#filter { top: 14px; left: 14px; width: 300px; max-height: calc(100% - 28px); display: none; flex-direction: column; z-index: 22; }
+#filter.show { display: flex; }
+#filter .head { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+#filter .head h2 { margin: 0; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+#filter .head button { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; line-height: 1; }
+#filter .body { overflow: auto; padding: 12px 14px; }
+#filter label.section { display: block; font-size: 10px; color: var(--muted); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .03em; }
+#filter label.section.second { margin-top: 14px; }
+#filter .prop-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+#filter .prop-tools button {
+  font-size: 10px; padding: 2px 9px; cursor: pointer; text-transform: uppercase; letter-spacing: .03em;
+  background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); border-radius: 5px;
+}
+#filter .prop-tools button:hover { border-color: var(--accent); color: var(--text); }
+.filter-props { max-height: 150px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--bg); }
+.filter-chk { display: flex; align-items: center; gap: 8px; font-size: 12px; font-family: var(--mono); padding: 3px 2px; cursor: pointer; word-break: break-word; }
+.filter-chk input { accent-color: var(--accent); flex: none; }
+.filter-empty { font-size: 11px; color: var(--warn); line-height: 1.5; }
+#filter input[type="text"] {
+  width: 100%; padding: 8px 10px; font-family: var(--mono); font-size: 12px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+}
+#filter input[type="text"]:focus { outline: none; border-color: var(--accent); }
+#filter .filter-actions { margin-top: 10px; display: flex; gap: 6px; }
+#filter .fbtn {
+  flex: 1; padding: 7px 10px; font-size: 12px; cursor: pointer;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+}
+#filter .fbtn:hover { border-color: var(--accent); }
+#filter .filter-msg { margin-top: 8px; font-size: 11px; color: var(--good); min-height: 14px; word-break: break-word; }
+#filter .filter-msg.warn { color: var(--warn); }
+
 /* ---- Position panel ---- */
 #position { top: 60px; right: 14px; width: 290px; max-height: calc(100% - 74px); display: none; flex-direction: column; z-index: 21; }
 #position.show { display: flex; }

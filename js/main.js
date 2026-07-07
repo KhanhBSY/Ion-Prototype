@@ -6,6 +6,7 @@ import { initI18n, setLang, getLang, onLangChange } from "./core/i18n.js";
 import { initLoader } from "./features/loader.js";
 import { initToolbar, setMode } from "./features/modes.js";
 import { initInspect } from "./features/inspect.js";
+import { initFilter } from "./features/filter.js";
 import { initExplode } from "./features/explode.js";
 import { initReposition } from "./features/reposition.js";
 import { initPresentation, refreshPresentationLang } from "./features/presentation.js";
@@ -22,6 +23,7 @@ function boot() {
   initLoader();
   initToolbar();
   initInspect();
+  initFilter();
   initExplode();
   initReposition();
   initPresentation();
