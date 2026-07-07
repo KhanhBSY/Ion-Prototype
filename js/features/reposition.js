@@ -1,13 +1,99 @@
 // features/reposition.js
 // Positioning panel: lat/lon/height/heading/pitch/roll inputs, place-at-camera,
-// click-on-map, save (localStorage), reset, and fly-to-model.
+// click-on-map, save, reset, and fly-to-model.
 //
-// Adapted from the CS4D reposition.js for this single-model, backend-free
-// prototype: positions persist to localStorage instead of the ion description.
+// Location strategy (mirrors the CS4D approach, adapted backend-free):
+//   • Every asset first loads at its ORIGINAL/native transform — georeferenced
+//     assets already sit correctly on the globe, so we never touch them.
+//   • A previously saved position (ion asset description, or localStorage cache)
+//     always wins and is re-applied on load.
+//   • An asset with NO geo-reference (its native centre falls near the Earth's
+//     core) is dropped at Tokyo the first time and that position is written back
+//     to the ion asset description, so it re-loads in the same place next time.
 
 import { state } from "../core/state.js";
 import { $ } from "../core/utils.js";
 import { t, onLangChange } from "../core/i18n.js";
+
+// Default drop point for non-georeferenced assets (Tokyo Station).
+const TOKYO = { lat: 35.681236, lon: 139.767125, height: 0, heading: 0, pitch: 0, roll: 0 };
+
+// ── Cesium ion asset-description persistence (backend-free) ───────
+// We talk to the ion REST API directly from the browser using the same token
+// used to load the tileset. A tiny marker line embeds the position JSON inside
+// the human-readable description, so it round-trips without a separate backend.
+const ION_API = "https://api.cesium.com/v1";
+const POS_MARKER = "__eb_pos__:";
+
+function parsePosFromDescription(description) {
+  const m = (description ?? "").match(/__eb_pos__:(\{[^\n]+\})/);
+  if (!m) return null;
+  try { return JSON.parse(m[1]); } catch (_) { return null; }
+}
+
+function embedPosInDescription(description, pos) {
+  const stripped = (description ?? "").replace(/\n?__eb_pos__:[^\n]*/g, "");
+  return `${stripped}\n${POS_MARKER}${JSON.stringify(pos)}`;
+}
+
+async function fetchIonAsset(assetId) {
+  const res = await fetch(`${ION_API}/assets/${assetId}`, {
+    headers: { Authorization: `Bearer ${Cesium.Ion.defaultAccessToken}` },
+  });
+  if (!res.ok) throw new Error(`ion GET ${res.status}`);
+  return res.json();
+}
+
+// Read a saved position from the ion asset description (null if none / on error).
+export async function loadIonPosition(assetId) {
+  try {
+    const asset = await fetchIonAsset(assetId);
+    return parsePosFromDescription(asset.description);
+  } catch (_) { return null; }
+}
+
+// Persist a position into the ion asset description (throws on failure).
+async function saveIonPosition(assetId, pos) {
+  const asset = await fetchIonAsset(assetId);
+  const res = await fetch(`${ION_API}/assets/${assetId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Cesium.Ion.defaultAccessToken}`,
+    },
+    body: JSON.stringify({
+      name: asset.name,
+      description: embedPosInDescription(asset.description, pos),
+    }),
+  });
+  if (!res.ok) throw new Error(`ion PATCH ${res.status}`);
+}
+
+// Remove any saved position from the ion asset description (throws on failure).
+async function clearIonPosition(assetId) {
+  const asset = await fetchIonAsset(assetId);
+  const stripped = (asset.description ?? "").replace(/\n?__eb_pos__:[^\n]*/g, "");
+  const res = await fetch(`${ION_API}/assets/${assetId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Cesium.Ion.defaultAccessToken}`,
+    },
+    body: JSON.stringify({ name: asset.name, description: stripped }),
+  });
+  if (!res.ok) throw new Error(`ion PATCH ${res.status}`);
+}
+
+// Is the asset georeferenced? A non-georeferenced (local-CAD) tileset has its
+// native centre near the ECEF origin, which maps to a cartographic height close
+// to -6,378 km (the Earth's radius). Real-world assets sit within a sane band.
+function isGeoreferenced(tileset) {
+  try {
+    const carto = Cesium.Cartographic.fromCartesian(tileset.boundingSphere.center);
+    if (!carto) return false;
+    return carto.height > -50000 && carto.height < 200000;
+  } catch (_) { return false; }
+}
 
 // ── Core: apply lat/lon/height/heading/pitch/roll to the tileset matrix ──
 export function applyPosition() {
@@ -27,16 +113,17 @@ export function applyPosition() {
     Cesium.Math.toRadians(roll)
   );
 
-  // Rebase the model from the East-North-Up frame at its ORIGINAL location to the
-  // ENU frame at the TARGET. Because an ENU frame's rotation depends only on
-  // lat/lon (not height), this preserves the model's native orientation — moving
-  // height becomes a pure vertical translation instead of a rotation. heading/
-  // pitch/roll are then applied as a delta on top of the native orientation.
-  const target = Cesium.Transforms.headingPitchRollToFixedFrame(position, hpr);
-  const source = Cesium.Transforms.eastNorthUpToFixedFrame(state.originalCenter);
-  const inverseSource = Cesium.Matrix4.inverse(source, new Cesium.Matrix4());
-
-  state.tileset.modelMatrix = Cesium.Matrix4.multiply(target, inverseSource, new Cesium.Matrix4());
+  // Build the East-North-Up + HPR frame at the target, then translate the model
+  // so its native centre lands at that frame's origin. This drops the asset onto
+  // the globe upright — exactly what a non-georeferenced model needs.
+  const fixedFrame = Cesium.Transforms.headingPitchRollToFixedFrame(position, hpr);
+  state.tileset.modelMatrix = Cesium.Matrix4.multiply(
+    fixedFrame,
+    Cesium.Matrix4.fromTranslation(
+      Cesium.Cartesian3.negate(state.originalCenter, new Cesium.Cartesian3())
+    ),
+    new Cesium.Matrix4()
+  );
 }
 
 // ── Fill inputs from a position object ────────────────────────────
@@ -67,25 +154,42 @@ function currentPosition() {
 }
 
 // ── Called once after a model loads ──────────────────────────────
-// Match ion exactly: do NOT modify the asset's native transform on load. ion's
-// own code snippet adds the tileset with no modelMatrix change, so whatever the
-// asset ships with is already correct. Repositioning is opt-in via this panel or
-// a previously saved position.
-//
-// (An earlier "auto-level" heuristic proved unreliable — classifying georeferenced
-// vs not by bounding-sphere distance mis-fired when the sphere wasn't settled yet,
-// tilting models that were already correct.)
-export function onModelLoaded() {
-  const saved = localStorage.getItem(`model_position_${state.assetId}`);
-  if (saved) {
-    try {
-      const pos = JSON.parse(saved);
-      fillInputs(pos);
-      applyPosition();
-      return;
-    } catch (_) {}
+// Order of precedence:
+//   1. Saved position (localStorage cache, then ion asset description) → apply.
+//   2. Georeferenced asset with no saved position → keep native transform.
+//   3. Non-georeferenced asset, first ever load → drop at Tokyo and persist.
+export async function onModelLoaded() {
+  // 1a. localStorage cache (fast, this-browser).
+  let pos = null;
+  const cached = localStorage.getItem(`model_position_${state.assetId}`);
+  if (cached) { try { pos = JSON.parse(cached); } catch (_) {} }
+
+  // 1b. ion asset description (cross-device) if nothing cached locally.
+  if (!pos) {
+    pos = await loadIonPosition(state.assetId);
+    if (pos) localStorage.setItem(`model_position_${state.assetId}`, JSON.stringify(pos));
   }
-  fillInputs(currentPosition());
+
+  if (pos) {
+    fillInputs(pos);
+    applyPosition();
+    return;
+  }
+
+  // 2. Georeferenced → leave the native transform untouched.
+  if (isGeoreferenced(state.tileset)) {
+    fillInputs(currentPosition());
+    return;
+  }
+
+  // 3. Non-georeferenced, first load → drop at Tokyo and persist for next time.
+  const drop = { ...TOKYO };
+  fillInputs(drop);
+  applyPosition();
+  localStorage.setItem(`model_position_${state.assetId}`, JSON.stringify(drop));
+  saveIonPosition(state.assetId, drop).catch((err) =>
+    console.warn("ion position auto-save failed:", err)
+  );
 }
 
 // ── Click-on-map ──────────────────────────────────────────────────
@@ -155,8 +259,8 @@ export function initReposition() {
     else startClickToPlace();
   });
 
-  // Save to localStorage
-  $("save-position-btn").addEventListener("click", () => {
+  // Save: localStorage (immediate) + ion asset description (cross-device).
+  $("save-position-btn").addEventListener("click", async () => {
     if (!state.tileset) return;
     const pos = {
       lat:     parseFloat($("pos-lat").value)     || 0,
@@ -167,16 +271,27 @@ export function initReposition() {
       roll:    parseFloat($("pos-roll").value)    || 0,
     };
     localStorage.setItem(`model_position_${state.assetId}`, JSON.stringify(pos));
+
     const msg = $("save-position-msg");
-    msg.textContent = t("pos.saved");
+    msg.textContent = t("pos.saving");
     msg.classList.remove("hidden");
-    setTimeout(() => msg.classList.add("hidden"), 2500);
+    try {
+      await saveIonPosition(state.assetId, pos);
+      msg.textContent = t("pos.saved");
+    } catch (err) {
+      msg.textContent = t("pos.savedLocalOnly");
+      console.warn("ion position save failed:", err);
+    }
+    setTimeout(() => msg.classList.add("hidden"), 3000);
   });
 
-  // Reset: clear any saved position and restore the asset's native transform.
+  // Reset: forget saved position (localStorage + ion) and restore native transform.
   $("reset-position-btn").addEventListener("click", () => {
     if (!state.tileset) return;
     localStorage.removeItem(`model_position_${state.assetId}`);
+    clearIonPosition(state.assetId).catch((err) =>
+      console.warn("ion position clear failed:", err)
+    );
     state.tileset.modelMatrix = Cesium.Matrix4.IDENTITY.clone();
     fillInputs(currentPosition());
   });

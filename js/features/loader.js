@@ -37,7 +37,7 @@ async function loadAsset() {
     state.modelRadius = tileset.boundingSphere.radius || 1;
 
     setupExplodeShader();
-    onModelLoaded(); // restore saved position (if any) before zooming
+    await onModelLoaded(); // restore saved / drop non-georef at Tokyo before zooming
 
     await state.viewer.zoomTo(tileset, new Cesium.HeadingPitchRange(0.4, -0.5, state.modelRadius * 2.2));
 

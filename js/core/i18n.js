@@ -53,7 +53,9 @@ export const translations = {
     "pos.save": "Save",
     "pos.reset": "Reset",
     "pos.hint": "Click a point on the globe to place the model there.",
-    "pos.saved": "Saved to this browser.",
+    "pos.saving": "Saving…",
+    "pos.saved": "Saved to Cesium ion.",
+    "pos.savedLocalOnly": "Saved to this browser only.",
     "pos.aimGround": "Aim the camera at the ground first.",
   },
 
@@ -107,7 +109,9 @@ export const translations = {
     "pos.save": "保存",
     "pos.reset": "リセット",
     "pos.hint": "地球上の点をクリックしてモデルを配置します。",
-    "pos.saved": "このブラウザに保存しました。",
+    "pos.saving": "保存中…",
+    "pos.saved": "Cesium ion に保存しました。",
+    "pos.savedLocalOnly": "このブラウザのみに保存しました。",
     "pos.aimGround": "先にカメラを地面に向けてください。",
   },
 };
